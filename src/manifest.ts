@@ -1740,6 +1740,11 @@ function mergeReleaserConfig(
       pathConfig.bumpPatchForMinorPreMajor ??
       defaultConfig.bumpPatchForMinorPreMajor,
     prereleaseType: pathConfig.prereleaseType ?? defaultConfig.prereleaseType,
+    extraPrefixMapping:
+      pathConfig.extraPrefixMapping ?? defaultConfig.extraPrefixMapping,
+    inferConventionalCommits:
+      pathConfig.inferConventionalCommits ??
+      defaultConfig.inferConventionalCommits,
     versioning: pathConfig.versioning ?? defaultConfig.versioning,
     changelogSections:
       pathConfig.changelogSections ?? defaultConfig.changelogSections,
