@@ -102,6 +102,7 @@ export interface ReleaserConfig {
   bumpPatchForMinorPreMajor?: boolean;
   prereleaseType?: string;
   extraPrefixMapping?: Record<string, string>;
+  inferConventionalCommits?: boolean;
 
   // Strategy options
   releaseAs?: string;
@@ -163,6 +164,7 @@ interface ReleaserConfigJson {
   'bump-patch-for-minor-pre-major'?: boolean;
   'prerelease-type'?: string;
   'extra-prefix-mapping'?: Record<string, string>;
+  'infer-conventional-commits'?: boolean;
   'changelog-sections'?: ChangelogSection[];
   'release-as'?: string;
   'skip-github-release'?: boolean;
@@ -738,7 +740,8 @@ export class Manifest {
       let pathCommits = parseConventionalCommits(
         commitsPerPath[path],
         this.logger,
-        config.extraPrefixMapping
+        config.extraPrefixMapping,
+        config.inferConventionalCommits
       );
       // The processCommits hook can be implemented by plugins to
       // post-process commits. This can be used to perform cleanup, e.g,, sentence
@@ -1383,6 +1386,7 @@ function extractReleaserConfig(
     bumpPatchForMinorPreMajor: config['bump-patch-for-minor-pre-major'],
     prereleaseType: config['prerelease-type'],
     extraPrefixMapping: config['extra-prefix-mapping'],
+    inferConventionalCommits: config['infer-conventional-commits'],
     versioning: config['versioning'],
     changelogSections: config['changelog-sections'],
     changelogPath: config['changelog-path'],

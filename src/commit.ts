@@ -25,6 +25,108 @@ import * as parser from '@conventional-commits/parser';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const conventionalCommitsFilter = require('conventional-commits-filter');
 
+/**
+ * Infer conventional commit type from first word of a non-conventional commit message.
+ * This handles commits from tools like Replit that don't follow conventional commit format.
+ * 
+ * Returns an object with the inferred type and whether it should be marked as breaking.
+ * Non-conventional commits are treated as potentially breaking since they come from
+ * users who may have made breaking changes without explicitly marking them.
+ */
+function inferCommitTypeFromMessage(message: string): {type: string; breaking: boolean} {
+  // Get first line, extract first word, normalize to lowercase, strip punctuation
+  const firstLine = message.split('\n')[0] || '';
+  const firstWord = (firstLine.split(/\s+/)[0] || '')
+    .replace(/[^a-zA-Z]/g, '')
+    .toLowerCase();
+
+  // Map based on first word - matching the husky commit-msg hook logic
+  switch (firstWord) {
+    // Features (breaking) - new functionality
+    case 'add':
+    case 'enable':
+    case 'allow':
+    case 'implement':
+    case 'introduce':
+    case 'integrate':
+    case 'expand':
+    case 'animate':
+    case 'persist':
+    case 'show':
+    case 'hide':
+      return {type: 'feat', breaking: true};
+
+    // Bug fixes (breaking)
+    case 'fix':
+    case 'correct':
+    case 'resolve':
+    case 'handle':
+      return {type: 'fix', breaking: true};
+
+    // Updates/improvements -> features (breaking)
+    case 'update':
+    case 'improve':
+    case 'enhance':
+    case 'enlarge':
+      return {type: 'feat', breaking: true};
+
+    // Refactoring (breaking)
+    case 'refactor':
+    case 'simplify':
+    case 'move':
+    case 'rearrange':
+    case 'organize':
+    case 'consolidate':
+    case 'replace':
+    case 'extract':
+      return {type: 'refactor', breaking: true};
+
+    // Style changes (breaking)
+    case 'adjust':
+    case 'align':
+    case 'make':
+    case 'apply':
+    case 'restyle':
+      return {type: 'style', breaking: true};
+
+    // Removals (breaking)
+    case 'remove':
+    case 'delete':
+    case 'drop':
+      return {type: 'chore', breaking: true};
+
+    // Performance improvements (breaking)
+    case 'optimize':
+    case 'speed':
+    case 'cache':
+      return {type: 'perf', breaking: true};
+
+    // Prevent/stop actions (breaking fix)
+    case 'prevent':
+    case 'stop':
+      return {type: 'fix', breaking: true};
+
+    // Replit system messages (not breaking - just noise)
+    case 'saved':
+    case 'transitioned':
+    case 'extracted':
+      return {type: 'replit', breaking: false};
+
+    // Initial commit
+    case 'initial':
+      return {type: 'chore', breaking: false};
+
+    // Restores -> reverts (breaking)
+    case 'restored':
+    case 'restore':
+      return {type: 'revert', breaking: true};
+
+    // Default: treat as breaking feature (conservative approach)
+    default:
+      return {type: 'feat', breaking: true};
+  }
+}
+
 export interface Commit {
   sha: string;
   message: string;
@@ -401,6 +503,7 @@ function splitMessages(message: string): string[] {
  * @param commits {Commit[]} The input commits
  * @param logger {Logger} The logger to use for debug messages
  * @param extraPrefixMapping {Record<string, string>} Map custom prefixes to conventional commit types. Use empty string ("") for non-conventional commits.
+ * @param inferConventionalCommits {boolean} When true, infer commit type from first word of non-conventional commits (e.g., "Add feature" -> feat!, "Fix bug" -> fix!)
  *
  * @returns {ConventionalCommit[]} Parsed and expanded commits. There may be
  *   more commits returned as a single raw commit may contain multiple release
@@ -409,7 +512,8 @@ function splitMessages(message: string): string[] {
 export function parseConventionalCommits(
   commits: Commit[],
   logger: Logger = defaultLogger,
-  extraPrefixMapping?: Record<string, string>
+  extraPrefixMapping?: Record<string, string>,
+  inferConventionalCommits?: boolean
 ): ConventionalCommit[] {
   const conventionalCommits: ConventionalCommit[] = [];
 
@@ -452,8 +556,35 @@ export function parseConventionalCommits(
           }`
         );
         logger.debug(`error message: ${_err}`);
-        // Check for empty string mapping (non-conventional commits)
-        if (extraPrefixMapping && '' in extraPrefixMapping) {
+        // Check for infer mode first (smart keyword-based inference)
+        if (inferConventionalCommits) {
+          const bareMessage = commitMessage.split('\n')[0];
+          const inferred = inferCommitTypeFromMessage(commitMessage);
+          logger.debug(
+            `inferred commit type '${inferred.type}' (breaking: ${inferred.breaking}) from: ${commit.sha} "${bareMessage}"`
+          );
+          const notes: parser.Note[] = [];
+          if (inferred.breaking) {
+            notes.push({
+              title: 'BREAKING CHANGE',
+              text: bareMessage,
+            });
+          }
+          conventionalCommits.push({
+            sha: commit.sha,
+            message: commitMessage,
+            files: commit.files,
+            pullRequest: commit.pullRequest,
+            type: inferred.type,
+            scope: null,
+            bareMessage,
+            notes,
+            references: [],
+            breaking: inferred.breaking,
+          });
+        }
+        // Fallback to empty string mapping (non-conventional commits)
+        else if (extraPrefixMapping && '' in extraPrefixMapping) {
           const mappedType = extraPrefixMapping[''];
           const bareMessage = commitMessage.split('\n')[0];
           logger.debug(

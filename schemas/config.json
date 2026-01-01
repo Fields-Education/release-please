@@ -27,6 +27,10 @@
             "type": "string"
           }
         },
+        "infer-conventional-commits": {
+          "description": "When true, infer commit type from the first word of non-conventional commit messages. Maps words like 'Add', 'Fix', 'Update' to feat, fix, etc. Non-conventional commits are marked as breaking (!) by default. Useful for handling commits from tools like Replit that don't follow conventional commit format.",
+          "type": "boolean"
+        },
         "prerelease-type": {
           "description": "Configuration option for the prerelease versioning strategy. If prerelease strategy used and type set, will set the prerelease part of the version to the provided value in case prerelease part is not present.",
           "type": "string"
